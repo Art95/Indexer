@@ -5,6 +5,7 @@ import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
+import main.Constants;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,17 +13,25 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
+
 /**
  * Created by artem on 13.06.16.
  */
-public class DocumentAnalyzer {
+public class TextAnalyzer {
     private StanfordCoreNLP pipeline;
+    private Set<String> stopWords;
 
 
-    public DocumentAnalyzer() {
+    public TextAnalyzer() {
         Properties props = new Properties();
         props.setProperty("annotators", "tokenize, ssplit, pos, lemma");
         this.pipeline = new StanfordCoreNLP(props);
+
+        try {
+            loadStopWords();
+        } catch (IOException ex) {
+            System.out.println("Can't load stop words!");
+        }
     }
 
     public HashMap<String, ArrayList<Integer>> getWordsOccurrences(File document) throws IOException {
@@ -42,7 +51,7 @@ public class DocumentAnalyzer {
 
         for (CoreMap sentence : sentences) {
             for (CoreLabel token : sentence.get(CoreAnnotations.TokensAnnotation.class)) {
-                String word = token.lemma().toLowerCase();
+                String word = token.get(CoreAnnotations.LemmaAnnotation.class).trim().toLowerCase();
 
                 wordsOccurrences.putIfAbsent(word, new ArrayList<>());
                 wordsOccurrences.get(word).add(currentPosition);
@@ -65,6 +74,22 @@ public class DocumentAnalyzer {
         }
 
         return text.toString();
+    }
+
+    private void loadStopWords() throws IOException {
+        stopWords = new HashSet<>();
+        File stopWordsFile = new File(Constants.STOP_WORDS_FILE);
+        InputStream in = new FileInputStream(stopWordsFile);
+        Scanner scan = new Scanner(in);
+
+        while (scan.hasNextLine()) {
+            stopWords.add(scan.nextLine().trim());
+        }
+    }
+
+    private boolean isStopSymbol(CoreLabel token) {
+        String pos = token.get(CoreAnnotations.PartOfSpeechAnnotation.class);
+        return pos.equals(".") || pos.equals(",");
     }
 
 }

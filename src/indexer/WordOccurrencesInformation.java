@@ -8,7 +8,7 @@ import java.util.List;
  */
 public class WordOccurrencesInformation {
     private Integer docID;
-    private Integer frequency;
+    private Double frequency;
     private List<Integer> positions;
 
     public WordOccurrencesInformation() {
@@ -17,9 +17,9 @@ public class WordOccurrencesInformation {
         positions = null;
     }
 
-    public WordOccurrencesInformation(int docID, List<Integer> positions) {
+    public WordOccurrencesInformation(int docID, double frequency, List<Integer> positions) {
         this.docID = docID;
-        this.frequency = positions.size();
+        this.frequency = frequency;
         this.positions = positions;
     }
 
@@ -31,11 +31,11 @@ public class WordOccurrencesInformation {
         this.docID = docID;
     }
 
-    public Integer getFrequency() {
+    public Double getFrequency() {
         return frequency;
     }
 
-    public void setFrequency(Integer frequency) {
+    public void setFrequency(Double frequency) {
         this.frequency = frequency;
     }
 
@@ -49,12 +49,40 @@ public class WordOccurrencesInformation {
 
     @Override
     public String toString() {
-        StringBuilder s = new StringBuilder("[" + docID + ", " + frequency + "]:");
+        StringBuilder s = new StringBuilder("(" + docID + ", " + frequency + "):");
 
         for (Integer position : positions) {
             s.append(" " + position);
         }
 
         return s.toString();
+    }
+
+    public static WordOccurrencesInformation parseString(String s) {
+        if (s.isEmpty())
+            return null;
+
+        String[] info = s.split("[(,):]");
+        final int parts = 3;
+
+        if (info.length < parts) {
+            throw new IllegalArgumentException("WordOccurrencesInformation: wrong string input for parsing");
+        }
+
+        Integer docID = Integer.parseInt(info[1].trim());
+        Double frequency = Double.parseDouble(info[2].trim());
+
+        String[] stringPositions = info[4].split(" ");
+        List<Integer> positions = new ArrayList<>();
+
+        for (String stringPosition : stringPositions) {
+            if (!stringPosition.isEmpty()) {
+                positions.add(Integer.parseInt(stringPosition.trim()));
+            }
+        }
+
+        WordOccurrencesInformation woi = new WordOccurrencesInformation(docID, frequency, positions);
+
+        return woi;
     }
 }
