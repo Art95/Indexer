@@ -1,0 +1,4 @@
+0#/home/artem/Documents/GMO corpus/Test/4.txt
+1#/home/artem/Documents/GMO corpus/Test/3.txt
+2#/home/artem/Documents/GMO corpus/Test/1.txt
+3#/home/artem/Documents/GMO corpus/Test/2.txt

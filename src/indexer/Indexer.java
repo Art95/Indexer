@@ -15,15 +15,21 @@ import java.util.*;
  */
 public class Indexer {
     private final static String INDEX_ADDRESS = "./files/index.txt";
+    private final static String FILES_IDs_ADDRESS = "./files/filesIDs.txt";
 
     private TextAnalyzer textAnalyzer;
-    private HashMap<String, List<WordOccurrencesInformation>> indexTable;
+    private Map<String, List<WordOccurrencesInformation>> indexTable;
+    private Map<Integer, String> filesIDs;
 
     public Indexer() {
         textAnalyzer = new TextAnalyzer();
 
         if (!loadIndexTable()) {
             indexTable = new HashMap<>();
+        }
+
+        if (!loadFilesIDs()) {
+            filesIDs = new HashMap<>();
         }
     }
 
@@ -50,16 +56,43 @@ public class Indexer {
                 ex.printStackTrace();
             }
 
+            filesIDs.put(docID, file.getAbsolutePath());
+
             ++docID;
         }
 
         sortOccurrences(indexTable);
+
         saveIndex();
+        saveDocsIDs();
     }
 
-    private void sortOccurrences(HashMap<String, List<WordOccurrencesInformation>> index) {
+    private void sortOccurrences(Map<String, List<WordOccurrencesInformation>> index) {
         for (String word : index.keySet()) {
             Collections.sort(index.get(word), (woi1, woi2) -> woi1.getDocID().compareTo(woi2.getDocID()));
+        }
+    }
+
+    private void saveDocsIDs() {
+        File indexFile = new File(FILES_IDs_ADDRESS);
+        BufferedWriter writer = null;
+
+        try {
+            writer = new BufferedWriter(new FileWriter(indexFile, false));
+
+            for (Integer id : filesIDs.keySet()) {
+                writer.write(id + "#" + filesIDs.get(id));
+                writer.write("\n");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                writer.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -113,6 +146,40 @@ public class Indexer {
             List<WordOccurrencesInformation> occurrences = parseWordOccurrences(parts[1]);
 
             indexTable.put(parts[0].trim(), occurrences);
+        }
+
+        return true;
+    }
+
+    private boolean loadFilesIDs() {
+        String content = null;
+        filesIDs = new HashMap<>();
+
+        try {
+            byte[] encoded = Files.readAllBytes(Paths.get(FILES_IDs_ADDRESS));
+            content = new String(encoded, Charset.defaultCharset());
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return false;
+        }
+
+        if (content.isEmpty()) {
+            return false;
+        }
+
+        String[] docsInfo = content.split("\n");
+
+        for (String docInfo : docsInfo) {
+            String[] parts = docInfo.split("#");
+
+            if (parts.length < 2) {
+                continue;
+            }
+
+            Integer id = Integer.parseInt(parts[0].trim());
+            String fileAddress = parts[1].trim();
+
+            filesIDs.put(id, fileAddress);
         }
 
         return true;
