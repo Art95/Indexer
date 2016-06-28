@@ -44,7 +44,7 @@ public class Indexer {
 
         for (File file : files) {
             try {
-                HashMap<String, ArrayList<Integer>> wordsPositions = textAnalyzer.getWordsOccurrences(file);
+                HashMap<String, List<Integer>> wordsPositions = textAnalyzer.getWordsOccurrences(file);
 
                 for (String word : wordsPositions.keySet()) {
                     indexTable.putIfAbsent(word, new ArrayList<>());
@@ -65,6 +65,23 @@ public class Indexer {
 
         saveIndex();
         saveDocsIDs();
+    }
+
+    public List<String> findDocuments(String query) {
+        HashMap<String, List<Integer>> words = textAnalyzer.getWordsOccurrences(query);
+        Set<String> filesAddresses = new HashSet<>();
+
+        for (String word : words.keySet()) {
+            if (indexTable.containsKey(word)) {
+                List<WordOccurrencesInformation> occurrences = indexTable.get(word);
+
+                for (WordOccurrencesInformation woi : occurrences) {
+                    filesAddresses.add(filesIDs.get(woi.getDocID()));
+                }
+            }
+        }
+
+        return new ArrayList<>(filesAddresses);
     }
 
     private void sortOccurrences(Map<String, List<WordOccurrencesInformation>> index) {

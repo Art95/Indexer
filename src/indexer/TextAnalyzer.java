@@ -34,16 +34,16 @@ public class TextAnalyzer {
         }
     }
 
-    public HashMap<String, ArrayList<Integer>> getWordsOccurrences(File document) throws IOException {
+    public HashMap<String, List<Integer>> getWordsOccurrences(File document) throws IOException {
         String text = readFile(document);
         return getWordsOccurrences(text);
     }
 
-    public HashMap<String, ArrayList<Integer>> getWordsOccurrences(String text) {
+    public HashMap<String, List<Integer>> getWordsOccurrences(String text) {
         Annotation document = new Annotation(text);
         this.pipeline.annotate(document);
 
-        HashMap<String, ArrayList<Integer>> wordsOccurrences = new HashMap<>();
+        HashMap<String, List<Integer>> wordsOccurrences = new HashMap<>();
 
         List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
 
