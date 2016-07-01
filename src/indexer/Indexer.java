@@ -1,6 +1,10 @@
 package indexer;
 
 
+import edu.stanford.nlp.ling.Word;
+import edu.stanford.nlp.ling.tokensregex.matcher.Match;
+import util.Pair;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -39,28 +43,28 @@ public class Indexer {
 
         File[] files = directory.listFiles();
 
-        int docID = 0;
+        int documentNumber = 0;
         indexTable = new HashMap<>();
 
         for (File file : files) {
-            try {
-                HashMap<String, List<Integer>> wordsPositions = textAnalyzer.getWordsOccurrences(file);
+            Map<String, WordOccurrencesInformation> wordsOccurrences = textAnalyzer.getWordsOccurrences(file);
 
-                for (String word : wordsPositions.keySet()) {
-                    indexTable.putIfAbsent(word, new ArrayList<>());
-                    indexTable.get(word).add(new WordOccurrencesInformation(docID,
-                            wordsPositions.get(word).size(), wordsPositions.get(word)));
-                }
-
-            } catch (IOException ex) {
-                ex.printStackTrace();
+            if (wordsOccurrences.isEmpty()) {
+                continue;
             }
 
-            filesIDs.put(docID, file.getAbsolutePath());
+            ++documentNumber;
 
-            ++docID;
+            for (String word : wordsOccurrences.keySet()) {
+                indexTable.putIfAbsent(word, new ArrayList<>());
+                wordsOccurrences.get(word).setDocID(documentNumber);
+                indexTable.get(word).add(wordsOccurrences.get(word));
+            }
+
+            filesIDs.put(documentNumber, file.getAbsolutePath());
         }
 
+        calculateWordsWeights(documentNumber);
         sortOccurrences(indexTable);
 
         saveIndex();
@@ -68,26 +72,108 @@ public class Indexer {
     }
 
     public List<String> findDocuments(String query) {
-        HashMap<String, List<Integer>> words = textAnalyzer.getWordsOccurrences(query);
-        Set<String> filesAddresses = new HashSet<>();
+        Map<String, WordOccurrencesInformation> wordsInfo = textAnalyzer.getWordsOccurrences(query);
+        weightWordsInQuery(wordsInfo);
 
-        for (String word : words.keySet()) {
-            if (indexTable.containsKey(word)) {
-                List<WordOccurrencesInformation> occurrences = indexTable.get(word);
+        Map<Integer, List<WordOccurrencesInformation>> wordsInDocuments = getWordsInDocuments(wordsInfo.keySet());
 
-                for (WordOccurrencesInformation woi : occurrences) {
-                    filesAddresses.add(filesIDs.get(woi.getDocID()));
+        /*double queryNormalizedLength = 0;
+
+        for (WordOccurrencesInformation woi : wordsInfo.values()) {
+            queryNormalizedLength += woi.getWordWeight() * woi.getWordWeight();
+        }
+
+        queryNormalizedLength = Math.sqrt(queryNormalizedLength);*/
+
+        List<Pair<Integer, Double>> documentsRates = new ArrayList<>();
+
+        for (Integer docID : wordsInDocuments.keySet()) {
+            double documentScore = 0;
+            //double documentNormalizedLength = 0;
+
+            for (WordOccurrencesInformation woi : wordsInDocuments.get(docID)) {
+                if (wordsInfo.containsKey(woi.getWord())) {
+                    //double queryTermWeight = wordsInfo.get(woi.getWord()).getWordWeight();
+                    double documentTermWeight = woi.getWordWeight();
+
+                    //cosineMeasure += queryTermWeight * documentTermWeight;
+                    documentScore += documentTermWeight;
                 }
+
+                //documentNormalizedLength += woi.getWordWeight() * woi.getWordWeight();
+            }
+
+            //documentNormalizedLength = Math.sqrt(documentNormalizedLength);
+
+            //cosineMeasure /= documentNormalizedLength * queryNormalizedLength;
+
+            documentsRates.add(new Pair<>(docID, documentScore));
+        }
+
+        Collections.sort(documentsRates, (pair1, pair2) -> pair2.getSecond().compareTo(pair1.getSecond()));
+
+        return getFilesAddresses(documentsRates);
+    }
+
+    private void weightWordsInQuery(Map<String, WordOccurrencesInformation> wordsInformation) {
+        for (String word : wordsInformation.keySet()) {
+            if (indexTable.containsKey(word)) {
+                List<WordOccurrencesInformation> woi = indexTable.get(word);
+
+                double docsWithWord = woi.size();
+                int documentsNumber = filesIDs.size();
+                double idf = Math.log10(documentsNumber / docsWithWord);
+
+                double wordWeight = wordsInformation.get(word).getLogFrequencyWeight() * idf;
+                wordsInformation.get(word).setWordWeight(wordWeight);
+            }
+        }
+    }
+
+    private Map<Integer, List<WordOccurrencesInformation>> getWordsInDocuments(Set<String> queryWords) {
+        Map<Integer, List<WordOccurrencesInformation>> wordsInDocuments = new HashMap<>();
+        Set<WordOccurrencesInformation> wordsOccurrences = new HashSet<>();
+
+        for (String word : queryWords) {
+            if (indexTable.containsKey(word)) {
+                wordsOccurrences.addAll(indexTable.get(word));
             }
         }
 
-        return new ArrayList<>(filesAddresses);
+        for (WordOccurrencesInformation woi : wordsOccurrences) {
+            wordsInDocuments.putIfAbsent(woi.getDocID(), new ArrayList<>());
+            wordsInDocuments.get(woi.getDocID()).add(woi);
+        }
+
+        return wordsInDocuments;
+    }
+
+    private void calculateWordsWeights(int numberOfDocuments) {
+        for (String word : indexTable.keySet()) {
+            double docsWithWord = indexTable.get(word).size();
+            double idf = Math.log10(numberOfDocuments / docsWithWord);
+
+            for (WordOccurrencesInformation woi : indexTable.get(word)) {
+                double tf_idf = woi.getLogFrequencyWeight() * idf;
+                woi.setWordWeight(tf_idf);
+            }
+        }
     }
 
     private void sortOccurrences(Map<String, List<WordOccurrencesInformation>> index) {
         for (String word : index.keySet()) {
             Collections.sort(index.get(word), (woi1, woi2) -> woi1.getDocID().compareTo(woi2.getDocID()));
         }
+    }
+
+    private List<String> getFilesAddresses(List<Pair<Integer, Double>> documentsRates) {
+        List<String> filesAddresses = new ArrayList<>();
+
+        for (Pair<Integer, Double> documentRate : documentsRates) {
+            filesAddresses.add(filesIDs.get(documentRate.getFirst()));
+        }
+
+        return filesAddresses;
     }
 
     private void saveDocsIDs() {
@@ -160,9 +246,11 @@ public class Indexer {
 
         for (String wordInfo : wordsInfo) {
             String[] parts = wordInfo.split("#");
-            List<WordOccurrencesInformation> occurrences = parseWordOccurrences(parts[1]);
 
-            indexTable.put(parts[0].trim(), occurrences);
+            String word = parts[0].trim();
+            List<WordOccurrencesInformation> occurrences = parseWordOccurrences(word, parts[1]);
+
+            indexTable.put(word, occurrences);
         }
 
         return true;
@@ -202,7 +290,7 @@ public class Indexer {
         return true;
     }
 
-    private List<WordOccurrencesInformation> parseWordOccurrences(String s) {
+    private List<WordOccurrencesInformation> parseWordOccurrences(String word, String s) {
         String[] wordOccurrencesInfo = s.split(";");
         List<WordOccurrencesInformation> occurrences = new ArrayList<>();
 
@@ -210,6 +298,7 @@ public class Indexer {
             WordOccurrencesInformation woi = WordOccurrencesInformation.parseString(wordOccurrenceInfo.trim());
 
             if (woi != null) {
+                woi.setWord(word);
                 occurrences.add(woi);
             }
         }

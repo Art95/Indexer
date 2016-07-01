@@ -2,6 +2,7 @@ package indexer;
 
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.ling.Word;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
@@ -34,33 +35,58 @@ public class TextAnalyzer {
         }
     }
 
-    public HashMap<String, List<Integer>> getWordsOccurrences(File document) throws IOException {
-        String text = readFile(document);
-        return getWordsOccurrences(text);
+    public Map<String, WordOccurrencesInformation> getWordsOccurrences(File document) {
+        try {
+            String text = readFile(document);
+            return getWordsOccurrences(text);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return new HashMap<>();
+        }
     }
 
-    public HashMap<String, List<Integer>> getWordsOccurrences(String text) {
+    public Map<String, WordOccurrencesInformation> getWordsOccurrences(String text) {
+        if (text.trim().isEmpty()) {
+            return new HashMap<>();
+        }
+
         Annotation document = new Annotation(text);
         this.pipeline.annotate(document);
 
-        HashMap<String, List<Integer>> wordsOccurrences = new HashMap<>();
-
+        Map<String, WordOccurrencesInformation> wordsOccurrences = new HashMap<>();
         List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
 
         int currentPosition = 0;
+        int totalNumberOfWords = 0;
 
         for (CoreMap sentence : sentences) {
             for (CoreLabel token : sentence.get(CoreAnnotations.TokensAnnotation.class)) {
                 String word = token.get(CoreAnnotations.LemmaAnnotation.class).trim().toLowerCase();
 
-                wordsOccurrences.putIfAbsent(word, new ArrayList<>());
-                wordsOccurrences.get(word).add(currentPosition);
+                if (!isStopSymbol(token)) {
+                    wordsOccurrences.putIfAbsent(word, new WordOccurrencesInformation());
+                    wordsOccurrences.get(word).setWord(word);
+                    wordsOccurrences.get(word).addPosition(currentPosition);
+
+                    ++totalNumberOfWords;
+                }
 
                 ++currentPosition;
             }
         }
 
+        calculateWordsLogFrequencies(wordsOccurrences, totalNumberOfWords);
+
         return wordsOccurrences;
+    }
+
+    private void calculateWordsLogFrequencies(Map<String, WordOccurrencesInformation> occurrences, int totalNumberOfWords) {
+        for (String word : occurrences.keySet()) {
+            double wordFrequency = occurrences.get(word).getTermFrequency();
+            double logFrequency = 1 + Math.log10(wordFrequency / totalNumberOfWords);
+
+            occurrences.get(word).setLogFrequencyWeight(logFrequency);
+        }
     }
 
     private String readFile(File file) throws IOException {

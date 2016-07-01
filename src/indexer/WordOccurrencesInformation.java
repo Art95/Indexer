@@ -7,21 +7,25 @@ import java.util.List;
  * Created by artem on 13.06.16.
  */
 public class WordOccurrencesInformation {
+    private String word;
     private Integer docID;
-    private Double frequency;
+    private Double logFrequencyWeight;
+    private Double wordWeight;
     private List<Integer> positions;
 
     public WordOccurrencesInformation() {
-        docID = null;
-        frequency = null;
-        positions = null;
+        word = "";
+        docID = -1;
+        logFrequencyWeight = 0.0;
+        wordWeight = 0.0;
+        positions = new ArrayList<>();
     }
 
-    public WordOccurrencesInformation(int docID, double frequency, List<Integer> positions) {
-        this.docID = docID;
-        this.frequency = frequency;
-        this.positions = positions;
+    public void setWord(String word) {
+        this.word = word;
     }
+
+    public String getWord() { return this.word; }
 
     public Integer getDocID() {
         return docID;
@@ -31,13 +35,19 @@ public class WordOccurrencesInformation {
         this.docID = docID;
     }
 
-    public Double getFrequency() {
-        return frequency;
+    public Double getWordWeight() {
+        return wordWeight;
     }
 
-    public void setFrequency(Double frequency) {
-        this.frequency = frequency;
+    public void setWordWeight(Double weight) {
+        this.wordWeight = weight;
     }
+
+    public void setLogFrequencyWeight(Double logWeight) { this.logFrequencyWeight = logWeight; }
+
+    public int getTermFrequency() { return this.positions.size(); }
+
+    public Double getLogFrequencyWeight() { return this.logFrequencyWeight; }
 
     public List<Integer> getPositions() {
         return positions;
@@ -47,9 +57,38 @@ public class WordOccurrencesInformation {
         this.positions = positions;
     }
 
+    public void addPosition(int position) {
+        this.positions.add(position);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof WordOccurrencesInformation)) return false;
+
+        WordOccurrencesInformation that = (WordOccurrencesInformation) o;
+
+        if (!word.equals(that.word)) return false;
+        if (!docID.equals(that.docID)) return false;
+        if (!logFrequencyWeight.equals(that.logFrequencyWeight)) return false;
+        if (!wordWeight.equals(that.wordWeight)) return false;
+        return positions.equals(that.positions);
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = word.hashCode();
+        result = 31 * result + docID.hashCode();
+        result = 31 * result + logFrequencyWeight.hashCode();
+        result = 31 * result + wordWeight.hashCode();
+        result = 31 * result + positions.hashCode();
+        return result;
+    }
+
     @Override
     public String toString() {
-        StringBuilder s = new StringBuilder("(" + docID + ", " + frequency + "):");
+        StringBuilder s = new StringBuilder("(" + docID + ", " + wordWeight + "):");
 
         for (Integer position : positions) {
             s.append(" " + position);
@@ -70,7 +109,7 @@ public class WordOccurrencesInformation {
         }
 
         Integer docID = Integer.parseInt(info[1].trim());
-        Double frequency = Double.parseDouble(info[2].trim());
+        Double weight = Double.parseDouble(info[2].trim());
 
         String[] stringPositions = info[4].split(" ");
         List<Integer> positions = new ArrayList<>();
@@ -81,7 +120,11 @@ public class WordOccurrencesInformation {
             }
         }
 
-        WordOccurrencesInformation woi = new WordOccurrencesInformation(docID, frequency, positions);
+        WordOccurrencesInformation woi = new WordOccurrencesInformation();
+
+        woi.setDocID(docID);
+        woi.setWordWeight(weight);
+        woi.setPositions(positions);
 
         return woi;
     }
