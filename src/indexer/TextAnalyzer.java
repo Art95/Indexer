@@ -2,11 +2,9 @@ package indexer;
 
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreLabel;
-import edu.stanford.nlp.ling.Word;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
-import main.Constants;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,6 +19,8 @@ import java.util.*;
 public class TextAnalyzer {
     private StanfordCoreNLP pipeline;
     private Set<String> stopWords;
+
+    private final static String STOP_WORDS_FILE = "./files/stopwords.txt";
 
 
     public TextAnalyzer() {
@@ -104,7 +104,7 @@ public class TextAnalyzer {
 
     private void loadStopWords() throws IOException {
         stopWords = new HashSet<>();
-        File stopWordsFile = new File(Constants.STOP_WORDS_FILE);
+        File stopWordsFile = new File(STOP_WORDS_FILE);
         InputStream in = new FileInputStream(stopWordsFile);
         Scanner scan = new Scanner(in);
 
