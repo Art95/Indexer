@@ -1,8 +1,6 @@
 package indexer;
 
 
-import edu.stanford.nlp.ling.Word;
-import edu.stanford.nlp.ling.tokensregex.matcher.Match;
 import util.Pair;
 
 import java.io.BufferedWriter;
@@ -13,6 +11,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by artem on 13.06.16.
@@ -72,14 +71,41 @@ public class Indexer {
     }
 
     public List<String> findDocuments(String query) {
-        Map<String, WordOccurrencesInformation> wordsInfo = textAnalyzer.getWordsOccurrences(query);
-        weightWordsInQuery(wordsInfo);
+        boolean citation = false;
 
-        Map<Integer, List<WordOccurrencesInformation>> wordsInDocuments = getWordsInDocuments(wordsInfo.keySet());
+        if (query.startsWith("\"") && query.endsWith("\"")) {
+            citation = true;
+            query = query.substring(1, query.length() - 1);
+        }
 
+        Map<String, WordOccurrencesInformation> queryWords = textAnalyzer.getWordsOccurrences(query);
+        weightWordsInQuery(queryWords);
+
+        Map<Integer, List<WordOccurrencesInformation>> wordsInDocuments = getWordsInDocuments(queryWords.keySet());
+
+        List<Integer> documentsIDs = new ArrayList<>();
+
+        if (citation) {
+            Map<Integer, List<WordOccurrencesInformation>> docsWithCitation =
+                    findDocumentsWithCitation(wordsInDocuments, queryWords);
+
+            documentsIDs.addAll(sortDocumentsBySimilarity(docsWithCitation, queryWords));
+
+            for (Integer docID : docsWithCitation.keySet()) {
+                wordsInDocuments.remove(docID);
+            }
+        }
+
+        documentsIDs.addAll(sortDocumentsBySimilarity(wordsInDocuments, queryWords));
+
+        return getFilesAddresses(documentsIDs);
+    }
+
+    private List<Integer> sortDocumentsBySimilarity(Map<Integer, List<WordOccurrencesInformation>> wordsInDocuments,
+                                           Map<String, WordOccurrencesInformation> queryWords) {
         /*double queryNormalizedLength = 0;
 
-        for (WordOccurrencesInformation woi : wordsInfo.values()) {
+        for (WordOccurrencesInformation woi : queryWords.values()) {
             queryNormalizedLength += woi.getWordWeight() * woi.getWordWeight();
         }
 
@@ -92,8 +118,8 @@ public class Indexer {
             //double documentNormalizedLength = 0;
 
             for (WordOccurrencesInformation woi : wordsInDocuments.get(docID)) {
-                if (wordsInfo.containsKey(woi.getWord())) {
-                    //double queryTermWeight = wordsInfo.get(woi.getWord()).getWordWeight();
+                if (queryWords.containsKey(woi.getWord())) {
+                    //double queryTermWeight = queryWords.get(woi.getWord()).getWordWeight();
                     double documentTermWeight = woi.getWordWeight();
 
                     //cosineMeasure += queryTermWeight * documentTermWeight;
@@ -104,15 +130,78 @@ public class Indexer {
             }
 
             //documentNormalizedLength = Math.sqrt(documentNormalizedLength);
-
             //cosineMeasure /= documentNormalizedLength * queryNormalizedLength;
 
             documentsRates.add(new Pair<>(docID, documentScore));
         }
 
         Collections.sort(documentsRates, (pair1, pair2) -> pair2.getSecond().compareTo(pair1.getSecond()));
+        List<Integer> documentsIDs = documentsRates.stream().map(Pair::getFirst).collect(Collectors.toList());
 
-        return getFilesAddresses(documentsRates);
+        return documentsIDs;
+    }
+
+    private Map<Integer, List<WordOccurrencesInformation>> findDocumentsWithCitation(
+            Map<Integer, List<WordOccurrencesInformation>> wordsInDocuments,
+            Map<String, WordOccurrencesInformation> queryWords) {
+
+        Map<String, List<Integer>> wordsPositions;
+        Map<Integer, List<WordOccurrencesInformation>> docsWithCitations = new HashMap<>();
+
+        for (Integer docID : wordsInDocuments.keySet()) {
+            if (wordsInDocuments.get(docID).size() < queryWords.size()) {
+                continue;
+            }
+
+            wordsPositions = new HashMap<>();
+
+            for (WordOccurrencesInformation woi : wordsInDocuments.get(docID)) {
+                wordsPositions.put(woi.getWord(), woi.getPositions());
+            }
+
+            List<Integer> citations = findCitations(wordsPositions, queryWords.keySet());
+
+            if (!citations.isEmpty()) {
+                docsWithCitations.put(docID, wordsInDocuments.get(docID));
+            }
+        }
+
+        return docsWithCitations;
+    }
+
+    private List<Integer> findCitations(Map<String, List<Integer>> wordsPositions, Set<String> queryWords) {
+        List<Integer> previousPositions = null;
+
+        for (String word : queryWords) {
+            if (!wordsPositions.containsKey(word)) {
+                previousPositions = null;
+                break;
+            }
+
+            if (previousPositions == null) {
+                previousPositions = wordsPositions.get(word);
+            } else {
+                List<Integer> newPositions = new ArrayList<>();
+
+                for (Integer position : wordsPositions.get(word)) {
+                    if (previousPositions.contains(position - 1)) {
+                        newPositions.add(position);
+                    }
+                }
+
+                previousPositions = newPositions;
+            }
+        }
+
+        List<Integer> starts = new ArrayList<>();
+
+        if (previousPositions != null) {
+            for (Integer position : previousPositions) {
+                starts.add(position - queryWords.size());
+            }
+        }
+
+        return starts;
     }
 
     private void weightWordsInQuery(Map<String, WordOccurrencesInformation> wordsInformation) {
@@ -166,11 +255,11 @@ public class Indexer {
         }
     }
 
-    private List<String> getFilesAddresses(List<Pair<Integer, Double>> documentsRates) {
+    private List<String> getFilesAddresses(List<Integer> documentsIDs) {
         List<String> filesAddresses = new ArrayList<>();
 
-        for (Pair<Integer, Double> documentRate : documentsRates) {
-            filesAddresses.add(filesIDs.get(documentRate.getFirst()));
+        for (Integer id : documentsIDs) {
+            filesAddresses.add(filesIDs.get(id));
         }
 
         return filesAddresses;

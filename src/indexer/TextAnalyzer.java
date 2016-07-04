@@ -47,13 +47,13 @@ public class TextAnalyzer {
 
     public Map<String, WordOccurrencesInformation> getWordsOccurrences(String text) {
         if (text.trim().isEmpty()) {
-            return new HashMap<>();
+            return new LinkedHashMap<>();
         }
 
         Annotation document = new Annotation(text);
         this.pipeline.annotate(document);
 
-        Map<String, WordOccurrencesInformation> wordsOccurrences = new HashMap<>();
+        Map<String, WordOccurrencesInformation> wordsOccurrences = new LinkedHashMap<>();
         List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
 
         int currentPosition = 0;

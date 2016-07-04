@@ -69,10 +69,7 @@ public class WordOccurrencesInformation {
         WordOccurrencesInformation that = (WordOccurrencesInformation) o;
 
         if (!word.equals(that.word)) return false;
-        if (!docID.equals(that.docID)) return false;
-        if (!logFrequencyWeight.equals(that.logFrequencyWeight)) return false;
-        if (!wordWeight.equals(that.wordWeight)) return false;
-        return positions.equals(that.positions);
+        return docID.equals(that.docID);
 
     }
 
@@ -80,9 +77,6 @@ public class WordOccurrencesInformation {
     public int hashCode() {
         int result = word.hashCode();
         result = 31 * result + docID.hashCode();
-        result = 31 * result + logFrequencyWeight.hashCode();
-        result = 31 * result + wordWeight.hashCode();
-        result = 31 * result + positions.hashCode();
         return result;
     }
 
